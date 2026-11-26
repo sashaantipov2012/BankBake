@@ -19,28 +19,29 @@
   import { cleanVersion, formatBytes, isNewerVersion } from "$lib/utils";
   import Button from "$lib/components/ui/button/Button.svelte";
   import Input from "$lib/components/ui/input/Input.svelte";
-  import Badge from "$lib/components/ui/badge/Badge.svelte";
   import EventCard from "$lib/components/EventCard.svelte";
   import SettingsModal from "$lib/components/SettingsModal.svelte";
   import UpdateModal from "$lib/components/UpdateModal.svelte";
   import {
-    Flame,
-    Settings,
-    UploadCloud,
-    FolderPlus,
-    Trash2,
-    CheckCircle2,
     AlertCircle,
-    Loader2,
-    FolderOpen,
-    Sparkles,
+    AudioLines,
+    CheckCircle2,
     ChevronDown,
     ChevronUp,
-    FileCode2,
-    Disc3,
-    FileArchive,
     Download,
+    FolderOpen,
+    Loader2,
+    Plus,
+    Settings,
   } from "lucide-svelte";
+
+  // Display-scaled peaks from 64 equal windows of samples/amb_bird_call_01.ogg.
+  const samplePeaks = [
+    13, 15, 20, 15, 16, 29, 17, 14, 38, 21, 44, 40, 22, 47, 41, 74,
+    52, 80, 89, 75, 48, 84, 86, 92, 89, 88, 64, 63, 99, 91, 69, 45,
+    88, 100, 61, 45, 91, 84, 71, 45, 71, 82, 43, 36, 27, 22, 19, 16,
+    14, 15, 14, 13, 14, 13, 13, 12, 13, 11, 11, 11, 9, 6, 5, 4,
+  ];
 
   // Application State
   let appVersion = $state("1.1.2");
@@ -76,7 +77,7 @@
   let compilerInfo = $state<CompilerInfo>({
     available: false,
     path: null,
-    source: "not_found",
+    source: "checking",
     version: null,
     message: "Checking FMOD Studio compiler...",
   });
@@ -617,414 +618,222 @@
   });
 </script>
 
-<div class="min-h-screen flex flex-col bg-zinc-950 text-zinc-100">
-  <!-- Simple Header with App Name, Version & FMOD Badges, Compiler Indicator & Settings Button -->
-  <header
-    class="sticky top-0 z-30 border-b border-zinc-800/80 bg-zinc-950/85 backdrop-blur-md"
-  >
-    <div
-      class="mx-auto flex max-w-4xl items-center justify-between px-5 py-3"
-    >
-      <!-- App Brand -->
-      <div class="flex items-center gap-2.5">
-        <div
-          class="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/35 text-amber-400 shadow-xs"
-        >
-          <Flame class="h-4 w-4 fill-amber-400/25" />
-        </div>
-        <div>
-          <div class="flex items-center gap-1.5">
-            <h1 class="text-sm font-semibold tracking-tight text-zinc-100 mr-0.5">
-              BankBake
-            </h1>
-            <span
-              class="rounded-md bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 text-[10px] font-mono text-amber-400/90"
-            >
-              {appVersion}
-            </span>
-            <span
-              class="rounded-md bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400"
-            >
-              FMOD 2.02
-            </span>
-          </div>
-        </div>
+<div class="flex min-h-screen flex-col">
+  <header class="sticky top-0 z-30 border-b bg-background">
+    <div class="workspace-width flex min-h-14 flex-wrap items-center justify-between gap-x-6 gap-y-2 py-2">
+      <div class="flex items-center gap-3">
+        <AudioLines class="text-primary" aria-hidden="true" />
+        <h1 class="text-base font-semibold">BankBake</h1>
+        <span class="border-l pl-3 font-mono text-xs text-muted-foreground">v{appVersion}</span>
       </div>
 
-      <!-- Right Controls: Open/Save Project + Compiler Indicator + Settings Button -->
-      <div class="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          class="h-8 px-2.5 text-xs"
-          title="Open a .bankbake project archive"
-          onclick={browseOpenProject}
-        >
-          <FileArchive class="h-3.5 w-3.5 text-amber-400" />
-          Open Project
+      <div class="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="ghost" size="sm" onclick={browseOpenProject}>
+          <FolderOpen aria-hidden="true" />
+          Open project
         </Button>
-
         {#if events.length > 0}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            class="h-8 px-2.5 text-xs"
-            title="Save a portable .bankbake project archive with all audio assets"
-            onclick={handleSaveProject}
-          >
-            <Download class="h-3.5 w-3.5 text-amber-400" />
-            Save Project
+          <Button type="button" variant="ghost" size="sm" onclick={handleSaveProject}>
+            <Download aria-hidden="true" />
+            Save project
           </Button>
         {/if}
-
-        {#if isDebugBuild || !compilerInfo.available}
-          <button
-            type="button"
-            onclick={() => (settingsOpen = true)}
-            title={compilerInfo.path ?? compilerInfo.message}
-            class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors {compilerInfo.available
-              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15'
-              : 'border-amber-500/35 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15'}"
-          >
-            <span
-              class="h-2 w-2 rounded-full {compilerInfo.available
-                ? 'bg-emerald-400'
-                : 'bg-amber-400 animate-pulse'}"
-            ></span>
-            <span>
-              {compilerInfo.available
-                ? "FMOD CLI Ready"
-                : "Compiler Not Found"}
-            </span>
-          </button>
-        {/if}
-
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           size="icon"
           title="Settings"
-          aria-label="Open Settings"
+          aria-label="Open settings"
           onclick={() => (settingsOpen = true)}
         >
-          <Settings class="h-4 w-4" />
+          <Settings aria-hidden="true" />
         </Button>
       </div>
     </div>
   </header>
 
-  <!-- Main Workspace -->
-  <main class="mx-auto w-full max-w-4xl flex-1 px-5 py-5 space-y-4">
-    <!-- Top Bar: Bank Name, Master Bank Name & Editable Output Folder -->
-    <section
-      class="rounded-xl border border-zinc-800/85 bg-zinc-900/50 p-4 shadow-xs"
-    >
-      <div class="flex flex-col sm:flex-row sm:items-end gap-3">
-        <!-- Bank Name Input -->
-        <div class="sm:w-52 space-y-1">
-          <label
-            for="bank-name-input"
-            class="block text-xs font-medium text-zinc-400"
-          >
-            Bank Name
-          </label>
-          <div class="relative flex items-center">
-            <Input
-              id="bank-name-input"
-              bind:value={bankName}
-              placeholder="e.g. Weapons, UI"
-              class="pr-14 font-mono text-sm h-9 bg-zinc-950/80 border-zinc-800"
-            />
-            <span
-              class="pointer-events-none absolute right-3 text-xs font-mono text-amber-400/80"
-            >
-              .bank
-            </span>
+  <main class="workspace-width flex flex-1 flex-col gap-6 py-6">
+    <section class="space-y-4" aria-labelledby="bank-setup-title">
+      <div class="flex items-center justify-between gap-4">
+        <h2 id="bank-setup-title" class="text-lg font-medium">Bank setup</h2>
+        <span class="font-mono text-xs text-muted-foreground">FMOD 2.02</span>
+      </div>
+
+      <div class="bank-fields rounded-xl border bg-card p-4">
+        <div class="min-w-0 space-y-2">
+          <label for="bank-name-input" class="field-label">Bank name</label>
+          <div class="relative">
+            <Input id="bank-name-input" bind:value={bankName} placeholder="SoundBank" class="pr-16 font-mono" />
+            <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center font-mono text-xs text-muted-foreground" aria-hidden="true">.bank</span>
           </div>
         </div>
 
-        <!-- Master Bank Name Input (Shown when Include Master Banks is enabled) -->
         {#if config.buildMasterBanks}
-          <div class="sm:w-52 space-y-1">
-            <label
-              for="master-bank-name-input"
-              class="block text-xs font-medium text-zinc-400"
-            >
-              Master Bank Name
-            </label>
-            <div class="relative flex items-center">
-              <Input
-                id="master-bank-name-input"
-                bind:value={masterBankName}
-                placeholder="Master"
-                class="pr-14 font-mono text-sm h-9 bg-zinc-950/80 border-zinc-800"
-              />
-              <span
-                class="pointer-events-none absolute right-3 text-xs font-mono text-amber-400/80"
-              >
-                .bank
-              </span>
+          <div class="min-w-0 space-y-2">
+            <label for="master-bank-name-input" class="field-label">Master bank name</label>
+            <div class="relative">
+              <Input id="master-bank-name-input" bind:value={masterBankName} placeholder="Master" class="pr-16 font-mono" />
+              <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center font-mono text-xs text-muted-foreground" aria-hidden="true">.bank</span>
             </div>
           </div>
         {/if}
 
-        <!-- Editable Output Folder with Direct Native Folder Picker on "Change" -->
-        <div class="flex-1 space-y-1">
-          <div class="flex items-center justify-between text-xs text-zinc-400">
-            <label for="output-folder-input">Output Folder</label>
-            <button
-              type="button"
-              onclick={pickOutputFolder}
-              class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 hover:text-amber-300 underline cursor-pointer"
-            >
-              <FolderOpen class="h-3 w-3" />
+        <div class="min-w-0 space-y-2">
+          <label for="output-folder-input" class="field-label">Output folder</label>
+          <div class="flex gap-2">
+            <Input
+              id="output-folder-input"
+              bind:value={outputDirInput}
+              onblur={() => persistOutputDirectory(outputDirInput)}
+              placeholder="./BakedBanks"
+              class="min-w-0 font-mono"
+            />
+            <Button type="button" variant="outline" onclick={pickOutputFolder} aria-label="Change output folder">
               Change
-            </button>
+            </Button>
           </div>
-          <Input
-            id="output-folder-input"
-            bind:value={outputDirInput}
-            onblur={() => persistOutputDirectory(outputDirInput)}
-            placeholder="./BakedBanks"
-            class="h-9 font-mono text-xs bg-zinc-950/80 border-zinc-800"
-          />
         </div>
       </div>
     </section>
 
-    <!-- Large Drag-and-Drop Audio Import Area -->
     <section
       aria-label="Audio import dropzone"
       ondragover={(e) => {
         e.preventDefault();
         isDragging = true;
       }}
-      ondragleave={() => {
-        isDragging = false;
-      }}
+      ondragleave={() => (isDragging = false)}
       ondrop={(e) => {
         e.preventDefault();
         isDragging = false;
       }}
-      class="relative rounded-2xl border-2 border-dashed transition-all duration-150 {isDragging
-        ? 'border-amber-400 bg-amber-500/10 shadow-lg shadow-amber-500/5'
-        : events.length === 0
-          ? 'border-zinc-800 hover:border-amber-500/50 bg-zinc-900/35 py-9 px-6'
-          : 'border-zinc-800/80 hover:border-amber-500/45 bg-zinc-900/25 py-4 px-5'}"
+      class="rounded-xl border bg-card transition-colors motion-reduce:transition-none {isDragging ? 'border-primary' : ''}"
+      class:empty-import={events.length === 0}
     >
       {#if events.length === 0}
-        <div class="flex flex-col items-center justify-center text-center space-y-3">
-          <div
-            class="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-400"
-          >
-            <UploadCloud class="h-6 w-6" />
-          </div>
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-zinc-200">
-              Drag & drop audio files or a <code class="text-amber-400">.bankbake</code> project here
-            </p>
-            <p class="text-xs text-zinc-500">
-              Supports WAV, OGG, MP3, FLAC, AIFF, WMA and <code class="text-zinc-400">.bankbake</code> archives • Auto-assigns <code class="text-zinc-400">event:/sfx/</code> or <code class="text-zinc-400">event:/music/</code> paths
-            </p>
-          </div>
-          <div class="flex flex-wrap items-center justify-center gap-2.5 pt-1">
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              class="h-8 px-3.5"
-              onclick={browseAudioFiles}
-            >
-              <FolderPlus class="h-3.5 w-3.5" />
-              Select Audio Files
+        <div class="import-copy">
+          <h2 class="text-2xl font-medium leading-tight">Add audio to your bank</h2>
+          <p class="mt-2 text-sm text-secondary-foreground">
+            Drop audio files or a <code>.bankbake</code> project here.
+          </p>
+          <p class="mt-2 font-mono text-xs text-muted-foreground">WAV, OGG, MP3, FLAC, AIFF, WMA</p>
+          <div class="mt-6 flex flex-wrap items-center gap-2">
+            <Button type="button" onclick={browseAudioFiles}>
+              <Plus aria-hidden="true" />
+              Select audio files
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              class="h-8 px-3"
-              onclick={browseOpenProject}
-            >
-              <FileArchive class="h-3.5 w-3.5 text-amber-400" />
-              Open .bankbake Project
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              class="h-8 px-3"
-              onclick={loadBundledSampleFiles}
-            >
-              <Sparkles class="h-3.5 w-3.5 text-amber-400" />
-              Load FMOD Sample Audio
+            <Button type="button" variant="outline" onclick={loadBundledSampleFiles}>
+              Load FMOD sample audio
             </Button>
           </div>
         </div>
-      {:else}
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex items-center gap-2.5">
-            <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400"
-            >
-              <UploadCloud class="h-4 w-4" />
-            </div>
-            <div>
-              <div class="text-xs font-medium text-zinc-200">
-                Drop more audio files anywhere in the window
-              </div>
-              <div class="text-[11px] text-zinc-500">
-                WAV, OGG, MP3, FLAC, AIFF, WMA
-              </div>
-            </div>
+
+        <figure class="sample-waveform">
+          <figcaption class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <span class="font-mono text-xs text-secondary-foreground">amb_bird_call_01.ogg</span>
+            <span class="text-xs text-muted-foreground">Bundled sample</span>
+          </figcaption>
+          <div class="sample-waveform-plot" aria-hidden="true">
+            {#each samplePeaks as peak}
+              <span style:height={`${peak}%`}></span>
+            {/each}
           </div>
+          <div class="sample-waveform-time" aria-hidden="true">
+            <span>0:00</span><span>0:01</span><span>0:02</span><span>0:03</span>
+          </div>
+        </figure>
+      {:else}
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <p class="text-sm text-secondary-foreground">Drop more audio files anywhere in the window</p>
           <div class="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onclick={browseAudioFiles}
-            >
-              <FolderPlus class="h-3.5 w-3.5" />
-              Add Files
+            <Button type="button" variant="outline" size="sm" onclick={browseAudioFiles}>
+              <Plus aria-hidden="true" />
+              Add files
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onclick={clearAllEvents}
-              class="text-zinc-400 hover:text-red-400"
-            >
-              <Trash2 class="h-3.5 w-3.5" />
-              Clear All
-            </Button>
+            <Button type="button" variant="ghost" size="sm" onclick={clearAllEvents}>Clear all</Button>
           </div>
         </div>
       {/if}
     </section>
 
-    <!-- Event Cards List -->
     {#if events.length > 0}
-      <section class="space-y-2.5">
-        <div class="flex items-center justify-between px-1">
-          <div class="flex items-center gap-2">
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Events ({events.length})
-            </h2>
-            <Badge variant="outline">
-              {events.filter((e) => e.category === "SFX").length} SFX •
-              {events.filter((e) => e.category === "MUSIC").length} Music
-            </Badge>
+      <section class="space-y-3" aria-labelledby="events-title">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-baseline gap-3">
+            <h2 id="events-title" class="text-lg font-medium">Events</h2>
+            <span class="font-mono text-xs text-muted-foreground">
+              {events.filter((event) => event.category === "SFX").length} SFX ·
+              {events.filter((event) => event.category === "MUSIC").length} music
+            </span>
           </div>
-          <span class="text-[11px] text-zinc-500">
-            Supports nested paths like <code class="text-zinc-400">event:/sfx/player/jump</code>
-          </span>
+          <span class="text-xs text-muted-foreground">Path example <code>event:/sfx/player/jump</code></span>
         </div>
-
-        <div class="space-y-2">
+        <div class="overflow-hidden rounded-xl border bg-card">
           {#each events as item (item.id)}
-            <EventCard
-              {item}
-              onRemove={removeEvent}
-              onUpdate={updateEvent}
-            />
+            <EventCard {item} onRemove={removeEvent} onUpdate={updateEvent} />
           {/each}
         </div>
       </section>
     {/if}
 
-    <!-- Build Status Banner (Success / Error / Details) -->
     {#if buildStatus === "error" && buildError}
-      <section
-        class="rounded-xl border border-red-500/35 bg-red-500/10 p-3.5 text-xs text-red-200 flex items-start gap-2.5"
-      >
-        <AlertCircle class="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
-        <div class="min-w-0 flex-1 space-y-1">
-          <div class="font-semibold text-red-300">Bank Compilation Error</div>
-          <pre class="whitespace-pre-wrap font-mono text-[11px] text-red-200/90 overflow-x-auto">{buildError}</pre>
-        </div>
+      <section class="space-y-2 rounded-xl border bg-card p-4" role="alert">
+        <h2 class="flex items-center gap-2 text-sm font-medium text-destructive">
+          <AlertCircle aria-hidden="true" />
+          Couldn’t bake the bank
+        </h2>
+        <pre class="whitespace-pre-wrap break-words font-mono text-xs text-secondary-foreground">{buildError}</pre>
       </section>
     {/if}
 
     {#if buildStatus === "success" && lastBakeResult}
-      <section
-        class="rounded-xl border border-emerald-500/35 bg-emerald-500/10 p-4 text-xs space-y-3"
-      >
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center gap-2.5">
-            <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-400" />
-            <div>
-              <div class="font-semibold text-emerald-200">
-                {lastBakeResult.message}
-              </div>
-              <div class="text-[11px] font-mono text-emerald-300/80">
-                Output: {lastBakeResult.outputDirectory}
-              </div>
-            </div>
+      <section class="space-y-4 rounded-xl border bg-card p-4" aria-labelledby="bake-result-title">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="min-w-0 space-y-1">
+            <h2 id="bake-result-title" class="flex items-center gap-2 text-sm font-medium">
+              <CheckCircle2 class="text-success" aria-hidden="true" />
+              {lastBakeResult.message}
+            </h2>
+            <p class="break-all font-mono text-xs text-muted-foreground">{lastBakeResult.outputDirectory}</p>
           </div>
-
-          <div class="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              class="border-emerald-500/35 bg-emerald-950/50 text-emerald-200 hover:bg-emerald-900/50"
-              onclick={openOutputFolder}
-            >
-              <FolderOpen class="h-3.5 w-3.5" />
-              Open Output Folder
+          <div class="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onclick={openOutputFolder}>
+              <FolderOpen aria-hidden="true" />
+              Open output folder
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              class="text-emerald-300 hover:bg-emerald-500/15"
+              aria-expanded={showBuildDetails}
               onclick={() => (showBuildDetails = !showBuildDetails)}
             >
-              <FileCode2 class="h-3.5 w-3.5" />
-              {showBuildDetails ? "Hide Details" : "GUIDs & Logs"}
-              {#if showBuildDetails}
-                <ChevronUp class="h-3.5 w-3.5" />
-              {:else}
-                <ChevronDown class="h-3.5 w-3.5" />
-              {/if}
+              GUIDs and logs
+              {#if showBuildDetails}<ChevronUp aria-hidden="true" />{:else}<ChevronDown aria-hidden="true" />{/if}
             </Button>
           </div>
         </div>
 
-        <!-- Compiled Bank File Pills -->
-        <div class="flex flex-wrap gap-2">
-          {#each lastBakeResult.builtFiles as bf}
-            <div
-              class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-zinc-950/70 px-2.5 py-1 text-[11px] font-mono text-zinc-200"
-            >
-              <Disc3 class="h-3 w-3 text-amber-400" />
-              <span>{bf.filename}</span>
-              <span class="text-zinc-500">({formatBytes(bf.sizeBytes)})</span>
-            </div>
+        <ul class="divide-y border-y font-mono text-xs">
+          {#each lastBakeResult.builtFiles as file (file.filename)}
+            <li class="flex justify-between gap-4 py-2">
+              <span class="break-all">{file.filename}</span>
+              <span class="shrink-0 text-muted-foreground">{formatBytes(file.sizeBytes)}</span>
+            </li>
           {/each}
-        </div>
+        </ul>
 
         {#if showBuildDetails}
-          <div class="grid grid-cols-1 {lastBakeResult.guidsContent ? 'md:grid-cols-2' : ''} gap-3 pt-2 border-t border-emerald-500/20">
+          <div class="grid gap-4 {lastBakeResult.guidsContent ? 'md:grid-cols-2' : ''}">
             {#if lastBakeResult.guidsContent}
-              <div class="space-y-1">
-                <div class="text-[11px] font-semibold text-emerald-300">
-                  Exported GUIDs.txt
-                </div>
-                <pre
-                  class="max-h-40 overflow-auto rounded-lg border border-zinc-800 bg-zinc-950/90 p-2.5 font-mono text-[11px] text-zinc-300"
-                >{lastBakeResult.guidsContent}</pre>
+              <div class="min-w-0 space-y-2">
+                <h3 class="field-label">GUIDs.txt</h3>
+                <pre class="log-output">{lastBakeResult.guidsContent}</pre>
               </div>
             {/if}
-            <div class="space-y-1">
-              <div class="text-[11px] font-semibold text-emerald-300">
-                FMOD Compiler Output
-              </div>
-              <pre
-                class="max-h-40 overflow-auto rounded-lg border border-zinc-800 bg-zinc-950/90 p-2.5 font-mono text-[11px] text-zinc-400"
-              >{lastBakeResult.compilerStdout}</pre>
+            <div class="min-w-0 space-y-2">
+              <h3 class="field-label">FMOD compiler output</h3>
+              <pre class="log-output">{lastBakeResult.compilerStdout}</pre>
             </div>
           </div>
         {/if}
@@ -1032,70 +841,57 @@
     {/if}
   </main>
 
-  <!-- Sticky Footer Action Bar with Prominent "Bake Bank" Button & Build Status Indicator -->
-  <footer
-    class="sticky bottom-0 z-30 border-t border-zinc-800/85 bg-zinc-950/90 backdrop-blur-md"
-  >
-    <div
-      class="mx-auto flex max-w-4xl items-center justify-between gap-4 px-5 py-3.5"
-    >
-      <!-- Build Status Indicator -->
-      <div class="flex items-center gap-2.5 text-xs">
-        {#if buildStatus === "baking"}
-          <Loader2 class="h-4 w-4 animate-spin text-amber-400" />
-          <span class="text-amber-300 font-medium">
-            Baking {bankName.trim() || "SoundBank"}.bank via FMOD Studio CLI...
-          </span>
-        {:else if buildStatus === "success"}
-          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-          <span class="text-zinc-300">
-            Build Ready • Last baked <strong class="text-emerald-300">{lastBakeResult?.bankName}.bank</strong>
-          </span>
-        {:else if buildStatus === "error"}
-          <span class="h-2 w-2 rounded-full bg-red-400"></span>
-          <span class="text-red-300">Build Failed — check error above</span>
-        {:else}
-          <span
-            class="h-2 w-2 rounded-full {events.length > 0 && compilerInfo.available
-              ? 'bg-amber-400'
-              : 'bg-zinc-600'}"
-          ></span>
-          <span class="text-zinc-400">
-            {#if events.length === 0}
-              Ready • Drop audio files to begin
+  <footer class="sticky bottom-0 z-30 border-t bg-background">
+    <div class="workspace-width flex min-h-16 items-center justify-between gap-3 py-3">
+      <div class="min-w-0" aria-live="polite">
+        <p class="break-words text-sm text-secondary-foreground">
+          {#if buildStatus === "baking"}
+            Baking <code>{bankName.trim() || "SoundBank"}.bank</code>
+          {:else if buildStatus === "success"}
+            Baked <code>{lastBakeResult?.bankName}.bank</code>
+          {:else if buildStatus === "error"}
+            <span class="text-destructive">Bake failed</span>
+          {:else if events.length === 0}
+            No audio loaded
+          {:else}
+            {events.length} {events.length === 1 ? "event" : "events"} in <code>{bankName.trim() || "SoundBank"}.bank</code>
+          {/if}
+        </p>
+        {#if isDebugBuild || !compilerInfo.available}
+          <button
+            type="button"
+            onclick={() => (settingsOpen = true)}
+            title={compilerInfo.path ?? compilerInfo.message}
+            class="status-link"
+          >
+            <span class="status-dot {compilerInfo.available ? 'bg-success' : 'bg-primary'}" aria-hidden="true"></span>
+            {#if compilerInfo.available}
+              FMOD compiler ready
+            {:else if compilerInfo.source === "checking"}
+              Checking FMOD compiler
             {:else}
-              Ready to bake <strong class="text-zinc-200">{events.length}</strong>
-              event{events.length === 1 ? "" : "s"} into
-              <strong class="text-amber-300 font-mono">{bankName.trim() || "SoundBank"}.bank</strong>
+              FMOD compiler unavailable
             {/if}
-          </span>
+          </button>
         {/if}
       </div>
-
-      <!-- Prominent "Bake Bank" Button -->
       <Button
         type="button"
-        variant="default"
         size="lg"
-        disabled={buildStatus === "baking" ||
-          events.length === 0 ||
-          !compilerInfo.available ||
-          !bankName.trim()}
+        class="shrink-0"
+        disabled={buildStatus === "baking" || events.length === 0 || !compilerInfo.available || !bankName.trim()}
         onclick={handleBakeBank}
-        class="min-w-[165px] font-semibold tracking-wide shadow-md shadow-amber-500/15"
       >
         {#if buildStatus === "baking"}
-          <Loader2 class="h-4 w-4 animate-spin" />
-          Baking Bank...
+          <Loader2 class="motion-safe:animate-spin" aria-hidden="true" />
+          Baking…
         {:else}
-          <Flame class="h-4 w-4 fill-zinc-950/20" />
-          Bake Bank
+          Bake bank
         {/if}
       </Button>
     </div>
   </footer>
 
-  <!-- Settings Modal -->
   <SettingsModal
     openModal={settingsOpen}
     {config}
@@ -1105,8 +901,6 @@
     onSave={handleSaveConfig}
     onRecheckCompiler={refreshCompilerStatus}
   />
-
-  <!-- Optional GitHub Release Update Popup -->
   <UpdateModal
     openModal={updateModalOpen}
     currentVersion={appVersion}
@@ -1114,3 +908,103 @@
     onDismiss={handleDismissUpdateModal}
   />
 </div>
+
+<style>
+  .workspace-width {
+    width: 100%;
+    max-width: 1440px;
+    margin-inline: auto;
+    padding-inline: clamp(16px, 3vw, 32px);
+  }
+
+  .bank-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 168px), 1fr));
+    gap: 16px;
+  }
+
+  @media (min-width: 720px) {
+    .bank-fields {
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(152px, 1fr);
+      grid-template-columns: none;
+    }
+
+    .bank-fields > :last-child {
+      grid-column: span 2;
+    }
+  }
+
+  .empty-import {
+    display: grid;
+    flex: 1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 24px;
+    min-height: 288px;
+    padding: clamp(16px, 4vw, 48px);
+  }
+
+  .sample-waveform {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    background: hsl(var(--background));
+  }
+
+  .sample-waveform-plot {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(1px, 0.25vw, 4px);
+    height: 104px;
+    margin-block: 12px 8px;
+    padding-inline: 2px;
+    background-image:
+      linear-gradient(to bottom, transparent calc(50% - 0.5px), hsl(var(--border)) 0, hsl(var(--border)) calc(50% + 0.5px), transparent 0),
+      repeating-linear-gradient(to right, hsl(var(--border)) 0 1px, transparent 1px calc(100% / 3));
+    border-right: 1px solid hsl(var(--border));
+  }
+
+  .sample-waveform-plot span {
+    min-height: 2px;
+    border-radius: 1px;
+    background: hsl(var(--primary));
+  }
+
+  .sample-waveform-time {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .status-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: hsl(var(--muted-foreground));
+    font-size: 12px;
+    text-align: start;
+  }
+
+  .status-link:hover {
+    color: hsl(var(--foreground));
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+  }
+
+  @media (max-width: 719px) {
+    .empty-import {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

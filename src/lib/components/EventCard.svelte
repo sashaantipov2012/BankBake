@@ -6,20 +6,8 @@
   import { formatDuration, formatBytes } from "$lib/utils";
   import Input from "$lib/components/ui/input/Input.svelte";
   import Switch from "$lib/components/ui/switch/Switch.svelte";
-  import {
-    Play,
-    Pause,
-    Square,
-    Repeat,
-    ChevronDown,
-    ChevronUp,
-    Trash2,
-    Volume2,
-    Activity,
-    Music,
-    Sparkles,
-    FileAudio,
-  } from "lucide-svelte";
+  import Button from "$lib/components/ui/button/Button.svelte";
+  import { Activity, ChevronDown, ChevronUp, Pause, Play, Square, Trash2 } from "lucide-svelte";
 
   interface Props {
     item: AudioEventCardItem;
@@ -196,15 +184,18 @@
     const url = await ensureBlobUrl();
     if (!waveformContainer) return;
 
+    const theme = getComputedStyle(waveformContainer);
+    const accent = `hsl(${theme.getPropertyValue("--primary").trim()})`;
+    const waveColor = `hsl(${theme.getPropertyValue("--muted-foreground").trim()} / 0.55)`;
     const ws = WaveSurfer.create({
       container: waveformContainer,
-      waveColor: "#52525b",
-      progressColor: "#f59e0b",
-      cursorColor: "#fbbf24",
+      waveColor,
+      progressColor: accent,
+      cursorColor: accent,
       barWidth: 2,
-      barGap: 1.5,
-      barRadius: 2,
-      height: 44,
+      barGap: 2,
+      barRadius: 1,
+      height: 48,
       normalize: true,
       url,
     });
@@ -310,206 +301,110 @@
   });
 </script>
 
-<div
-  class="group rounded-xl border border-zinc-800/85 bg-zinc-900/60 hover:border-zinc-700/90 transition-all duration-150 shadow-sm"
->
-  <!-- Main Compact Row -->
-  <div class="flex flex-wrap items-center gap-3 px-3.5 py-2.5">
-    <!-- Play / Pause Button -->
-    <button
-      type="button"
-      onclick={togglePlay}
-      disabled={loadingAudio}
-      title={isPlaying ? "Pause preview" : "Preview audio"}
-      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-all duration-150 {isPlaying
-        ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-sm shadow-amber-500/20'
-        : 'bg-zinc-800/90 text-zinc-200 border-zinc-700/70 hover:bg-zinc-700/80 hover:text-amber-300'}"
-    >
-      {#if isPlaying}
-        <Pause class="h-3.5 w-3.5 fill-current" />
-      {:else}
-        <Play class="h-3.5 w-3.5 fill-current ml-0.5" />
-      {/if}
-    </button>
-
-    {#if isPlaying || currentTime > 0}
-      <button
-        type="button"
-        onclick={stopPlayback}
-        title="Stop preview"
-        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-zinc-800/70 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/70 transition-colors"
-      >
-        <Square class="h-3 w-3 fill-current" />
-      </button>
-    {/if}
-
-    <!-- Audio Filename & Event Name Input -->
-    <div class="min-w-[180px] flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center">
-      <div class="flex items-center gap-2 min-w-0">
-        <FileAudio class="h-4 w-4 shrink-0 text-amber-400/80" />
-        <div class="min-w-0 flex-1">
-          <div
-            class="truncate text-xs font-medium text-zinc-300"
-            title={item.filePath}
-          >
-            {item.filename}
-          </div>
-          <div class="flex items-center gap-2 text-[11px] text-zinc-500 font-mono">
-            <span>
-              {#if isPlaying || currentTime > 0}
-                <span class="text-amber-400">{formatDuration(currentTime)}</span> /
-              {/if}
-              {formatDuration(item.duration)}
-            </span>
-            <span>•</span>
-            <span>{formatBytes(item.sizeBytes)}</span>
-          </div>
-        </div>
+<article class="border-b last:border-b-0" aria-label={item.filename}>
+  <div class="event-row">
+    <div class="event-source">
+      <div class="flex items-center gap-1">
+        <Button
+          type="button"
+          variant={isPlaying ? "secondary" : "outline"}
+          size="icon"
+          onclick={togglePlay}
+          disabled={loadingAudio}
+          title={isPlaying ? "Pause preview" : "Preview audio"}
+          aria-label={isPlaying ? "Pause preview" : "Preview audio"}
+        >
+          {#if isPlaying}<Pause aria-hidden="true" />{:else}<Play aria-hidden="true" />{/if}
+        </Button>
+        {#if isPlaying || currentTime > 0}
+          <Button type="button" variant="ghost" size="icon" onclick={stopPlayback} title="Stop preview" aria-label="Stop preview">
+            <Square aria-hidden="true" />
+          </Button>
+        {/if}
       </div>
-
-      <!-- Event Path Input (Fully Editable, supports nested paths like event:/sfx/player/jump) -->
-      <div class="flex items-center">
-        <Input
-          bind:value={item.eventName}
-          oninput={() => onUpdate(item)}
-          placeholder={item.category === "MUSIC"
-            ? "event:/music/track_name"
-            : "event:/sfx/player/sound_name"}
-          aria-label="Event path"
-          class="h-7 px-2.5 py-1 text-xs font-mono bg-zinc-950/70 border-zinc-800 focus-visible:border-amber-500/70"
-        />
+      <div class="min-w-0">
+        <p class="truncate text-sm font-medium" title={item.filePath}>{item.filename}</p>
+        <p class="flex flex-wrap gap-x-2 font-mono text-xs text-muted-foreground">
+          <span>
+            {#if isPlaying || currentTime > 0}<span class="text-primary">{formatDuration(currentTime)}</span> / {/if}{formatDuration(item.duration)}
+          </span>
+          <span>{formatBytes(item.sizeBytes)}</span>
+        </p>
       </div>
     </div>
 
-    <!-- Music / SFX Segmented Selection -->
-    <div
-      class="inline-flex h-7 shrink-0 items-center rounded-lg border border-zinc-800 bg-zinc-950/80 p-0.5"
-      role="group"
-      aria-label="Event category"
-    >
-      <button
+    <Input
+      bind:value={item.eventName}
+      oninput={() => onUpdate(item)}
+      placeholder={item.category === "MUSIC" ? "event:/music/track_name" : "event:/sfx/player/sound_name"}
+      aria-label="Event path"
+      class="h-8 min-w-0 font-mono text-xs"
+    />
+
+    <div class="event-actions flex flex-wrap items-center gap-2">
+      <div class="category-control" role="group" aria-label="Event category">
+        <button type="button" aria-pressed={item.category === "SFX"} onclick={() => setCategory("SFX")}>SFX</button>
+        <button type="button" aria-pressed={item.category === "MUSIC"} onclick={() => setCategory("MUSIC")}>Music</button>
+      </div>
+      <div class="flex items-center gap-2 px-1">
+        <span class="text-xs text-secondary-foreground">Loop</span>
+        <Switch bind:checked={item.looping} label="Toggle looping" onchange={() => onUpdate(item)} />
+      </div>
+      <Button
         type="button"
-        onclick={() => setCategory("SFX")}
-        class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all {item.category ===
-        'SFX'
-          ? 'bg-amber-500 text-zinc-950 shadow-sm font-semibold'
-          : 'text-zinc-400 hover:text-zinc-200'}"
+        variant={item.showWaveform ? "secondary" : "ghost"}
+        size="icon"
+        onclick={toggleWaveform}
+        title="Waveform"
+        aria-label="Waveform"
+        aria-expanded={item.showWaveform}
       >
-        <Sparkles class="h-3 w-3" />
-        SFX
-      </button>
-      <button
+        <Activity aria-hidden="true" />
+      </Button>
+      <Button
         type="button"
-        onclick={() => setCategory("MUSIC")}
-        class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all {item.category ===
-        'MUSIC'
-          ? 'bg-amber-500 text-zinc-950 shadow-sm font-semibold'
-          : 'text-zinc-400 hover:text-zinc-200'}"
+        variant={item.showAdvanced || item.volumeDb !== 0 || (item.looping && item.customLoopEnabled) ? "secondary" : "ghost"}
+        size="sm"
+        aria-expanded={item.showAdvanced}
+        onclick={() => {
+          item.showAdvanced = !item.showAdvanced;
+          onUpdate(item);
+        }}
       >
-        <Music class="h-3 w-3" />
-        Music
-      </button>
-    </div>
-
-    <!-- Looping Toggle -->
-    <div
-      class="flex items-center gap-1.5 shrink-0 px-1.5 py-1 rounded-lg border border-transparent hover:border-zinc-800/80"
-      title="Enable timeline loop region"
-    >
-      <Repeat
-        class="h-3.5 w-3.5 transition-colors {item.looping
-          ? 'text-amber-400'
-          : 'text-zinc-500'}"
-      />
-      <span
-        class="text-xs select-none {item.looping
-          ? 'text-amber-300 font-medium'
-          : 'text-zinc-400'}"
+        Advanced
+        {#if item.showAdvanced}<ChevronUp aria-hidden="true" />{:else}<ChevronDown aria-hidden="true" />{/if}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onclick={() => onRemove(item.id)}
+        title="Remove event"
+        aria-label="Remove event"
+        class="hover:text-destructive"
       >
-        Loop
-      </span>
-      <Switch
-        bind:checked={item.looping}
-        label="Toggle looping"
-        onchange={() => onUpdate(item)}
-      />
+        <Trash2 aria-hidden="true" />
+      </Button>
     </div>
-
-    <!-- Waveform Preview Toggle -->
-    <button
-      type="button"
-      onclick={toggleWaveform}
-      title="Toggle waveform visualization"
-      class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors {item.showWaveform
-        ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-        : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}"
-    >
-      <Activity class="h-3.5 w-3.5" />
-    </button>
-
-    <!-- Collapsible Advanced Settings Toggle -->
-    <button
-      type="button"
-      onclick={() => {
-        item.showAdvanced = !item.showAdvanced;
-        onUpdate(item);
-      }}
-      title="Advanced volume and loop settings"
-      class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-xs transition-colors {item.showAdvanced ||
-      item.volumeDb !== 0 ||
-      (item.looping && item.customLoopEnabled)
-        ? 'bg-amber-500/10 border-amber-500/35 text-amber-300'
-        : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}"
-    >
-      <span>Advanced</span>
-      {#if item.showAdvanced}
-        <ChevronUp class="h-3.5 w-3.5" />
-      {:else}
-        <ChevronDown class="h-3.5 w-3.5" />
-      {/if}
-    </button>
-
-    <!-- Remove Event Button -->
-    <button
-      type="button"
-      onclick={() => onRemove(item.id)}
-      title="Remove event"
-      class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-zinc-500 hover:bg-red-500/15 hover:text-red-400 transition-colors"
-    >
-      <Trash2 class="h-3.5 w-3.5" />
-    </button>
   </div>
 
-  <!-- Optional WaveSurfer.js Waveform Drawer -->
+  {#if audioError}
+    <p class="px-4 pb-3 text-sm text-destructive" role="alert">{audioError}</p>
+  {/if}
+
   {#if item.showWaveform}
-    <div class="border-t border-zinc-800/70 bg-zinc-950/60 px-4 py-2.5">
-      {#if audioError}
-        <div class="text-xs text-red-400 py-1">{audioError}</div>
-      {/if}
-      <div
-        bind:this={waveformContainer}
-        class="w-full rounded-md overflow-hidden cursor-pointer"
-      ></div>
+    <div class="border-t bg-background px-4 py-3">
+      <div bind:this={waveformContainer} class="track-waveform"></div>
     </div>
   {/if}
 
-  <!-- Collapsible Advanced Settings (Hidden by Default) -->
   {#if item.showAdvanced}
-    <div
-      class="border-t border-zinc-800/70 bg-zinc-950/45 px-4 py-3 text-xs grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-xl"
-    >
-      <!-- Volume Control (dB) -->
-      <div class="flex flex-col gap-1.5">
-        <div class="flex items-center justify-between">
-          <label
-            for="vol-{item.id}"
-            class="flex items-center gap-1.5 font-medium text-zinc-300"
-          >
-            <Volume2 class="h-3.5 w-3.5 text-amber-400" />
-            <span>Track Volume</span>
-          </label>
+    <div class="grid gap-4 border-t bg-background p-4 md:grid-cols-2">
+      <div class="space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <label for="vol-{item.id}" class="field-label">Track volume</label>
           <div class="flex items-center gap-2">
-            <span class="font-mono text-amber-300">
+            <span class="font-mono text-xs text-secondary-foreground">
               {item.volumeDb > 0 ? `+${item.volumeDb.toFixed(1)}` : item.volumeDb.toFixed(1)} dB
             </span>
             {#if item.volumeDb !== 0}
@@ -521,7 +416,7 @@
                   if (wavesurfer) wavesurfer.setVolume(1);
                   onUpdate(item);
                 }}
-                class="text-[11px] text-zinc-400 hover:text-amber-300 underline"
+                class="text-xs text-muted-foreground underline hover:text-foreground"
               >
                 Reset
               </button>
@@ -529,7 +424,7 @@
           </div>
         </div>
         <div class="flex items-center gap-3">
-          <span class="text-[11px] font-mono text-zinc-500">-24</span>
+          <span class="font-mono text-xs text-muted-foreground">−24</span>
           <input
             id="vol-{item.id}"
             type="range"
@@ -538,20 +433,17 @@
             step="0.5"
             value={item.volumeDb}
             oninput={handleVolumeInput}
-            class="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-zinc-800 accent-amber-500"
+            class="min-w-0 flex-1 cursor-pointer accent-primary"
           />
-          <span class="text-[11px] font-mono text-zinc-500">+10</span>
+          <span class="font-mono text-xs text-muted-foreground">+10</span>
         </div>
       </div>
 
-      <!-- Custom Loop Points -->
-      <div class="flex flex-col gap-1.5">
-        <div class="flex items-center justify-between">
+      <div class="space-y-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="field-label">Loop points</span>
           <div class="flex items-center gap-2">
-            <span class="font-medium text-zinc-300">Custom Loop Region (sec)</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-[11px] text-zinc-400">Enable custom points</span>
+            <span class="text-xs text-muted-foreground">Custom points</span>
             <Switch
               bind:checked={item.customLoopEnabled}
               disabled={!item.looping}
@@ -567,22 +459,15 @@
         </div>
 
         {#if !item.looping}
-          <p class="text-[11px] text-zinc-500 italic">
-            Enable the "Loop" toggle on this event card to configure custom loop points.
-          </p>
+          <p class="text-xs text-muted-foreground">Turn on Loop to set custom points.</p>
         {:else if !item.customLoopEnabled}
-          <p class="text-[11px] text-zinc-500">
-            Looping full audio duration (0.00s → {item.duration > 0 ? item.duration.toFixed(2) : "end"}s).
+          <p class="text-xs text-muted-foreground">
+            Loops the full track{item.duration > 0 ? ` (${item.duration.toFixed(2)} s)` : ""}.
           </p>
         {:else}
-          <div class="grid grid-cols-2 gap-2.5 pt-0.5">
-            <div>
-              <label
-                for="lstart-{item.id}"
-                class="block text-[11px] text-zinc-400 mb-1"
-              >
-                Loop Start (s)
-              </label>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="min-w-0 space-y-1">
+              <label for="lstart-{item.id}" class="field-label">Start (s)</label>
               <Input
                 id="lstart-{item.id}"
                 type="number"
@@ -590,25 +475,20 @@
                 step="0.05"
                 bind:value={item.loopStart}
                 oninput={() => onUpdate(item)}
-                class="h-7 text-xs font-mono bg-zinc-900"
+                class="h-8 font-mono text-xs"
               />
             </div>
-            <div>
-              <label
-                for="lend-{item.id}"
-                class="block text-[11px] text-zinc-400 mb-1"
-              >
-                Loop End (s)
-              </label>
+            <div class="min-w-0 space-y-1">
+              <label for="lend-{item.id}" class="field-label">End (s)</label>
               <Input
                 id="lend-{item.id}"
                 type="number"
                 min="0.05"
                 step="0.05"
                 bind:value={item.loopEnd}
-                placeholder={item.duration > 0 ? item.duration.toFixed(2) : "End"}
+                placeholder={item.duration > 0 ? item.duration.toFixed(2) : "End of track"}
                 oninput={() => onUpdate(item)}
-                class="h-7 text-xs font-mono bg-zinc-900"
+                class="h-8 font-mono text-xs"
               />
             </div>
           </div>
@@ -616,4 +496,71 @@
       </div>
     </div>
   {/if}
-</div>
+</article>
+
+<style>
+  .event-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.9fr) minmax(156px, 1.2fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .event-source {
+    display: grid;
+    grid-template-columns: 68px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+
+  .category-control {
+    display: flex;
+    height: 32px;
+    flex-shrink: 0;
+    align-items: stretch;
+    padding: 2px;
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    background: hsl(var(--background));
+  }
+
+  .category-control button {
+    border-radius: 4px;
+    padding: 0 8px;
+    font-size: 12px;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .category-control button:hover {
+    color: hsl(var(--foreground));
+  }
+
+  .category-control button[aria-pressed="true"] {
+    color: hsl(var(--foreground));
+    background: hsl(var(--secondary));
+  }
+
+  .track-waveform {
+    min-height: 64px;
+    padding: 8px 0;
+    cursor: pointer;
+    background-image: linear-gradient(to bottom, transparent calc(50% - 0.5px), hsl(var(--border)) 0, hsl(var(--border)) calc(50% + 0.5px), transparent 0);
+  }
+
+  @media (max-width: 840px) {
+    .event-row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .event-actions {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .event-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

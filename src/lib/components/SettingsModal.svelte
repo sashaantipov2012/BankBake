@@ -1,18 +1,11 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
   import type { AppConfig, CompilerInfo } from "$lib/types";
+  import Dialog from "$lib/components/ui/dialog/Dialog.svelte";
   import Button from "$lib/components/ui/button/Button.svelte";
   import Input from "$lib/components/ui/input/Input.svelte";
   import Switch from "$lib/components/ui/switch/Switch.svelte";
-  import {
-    X,
-    FolderOpen,
-    Terminal,
-    CheckCircle2,
-    AlertTriangle,
-    RefreshCw,
-    Bug,
-  } from "lucide-svelte";
+  import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-svelte";
 
   interface Props {
     openModal: boolean;
@@ -121,198 +114,119 @@
 </script>
 
 {#if openModal}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="settings-title"
-  >
-    <div
-      class="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl overflow-hidden"
-    >
-      <!-- Modal Header -->
-      <div
-        class="flex items-center justify-between border-b border-zinc-800 px-5 py-3.5"
-      >
-        <div class="flex items-center gap-2">
-          <Terminal class="h-4 w-4 text-amber-400" />
-          <h2 id="settings-title" class="text-sm font-semibold text-zinc-100">
-            BankBake Settings
-          </h2>
+  <Dialog title="Settings" {onClose}>
+    <section aria-labelledby="settings-output" class="space-y-3">
+      <h3 id="settings-output" class="text-sm font-medium">Bake output</h3>
+      <div class="divide-y rounded-md border bg-card px-3">
+        <div class="setting-row">
+          <div>
+            <p>Include master banks</p>
+            <p class="setting-help">Write the master bank and its strings file</p>
+          </div>
+          <Switch bind:checked={draft.buildMasterBanks} label="Include master banks" />
         </div>
-        <button
-          type="button"
-          onclick={onClose}
-          class="rounded-lg p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
-        >
-          <X class="h-4 w-4" />
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="space-y-4 p-5 text-xs">
-        <!-- Output Artifact Toggles -->
-        <div class="space-y-2.5">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="font-medium text-zinc-200">Include Master Banks</div>
-              <div class="text-[11px] text-zinc-500">
-                Also output <code class="text-zinc-400">Master.bank</code> and <code class="text-zinc-400">Master.strings.bank</code>
-              </div>
-            </div>
-            <Switch
-              bind:checked={draft.buildMasterBanks}
-              label="Include Master banks"
-            />
+        <div class="setting-row">
+          <div>
+            <p>Export GUIDs.txt</p>
+            <p class="setting-help">Write a lookup table for event, bus, and bank IDs</p>
           </div>
-
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="font-medium text-zinc-200">Export GUIDs.txt</div>
-              <div class="text-[11px] text-zinc-500">
-                Export event, bus and bank GUID lookup table alongside compiled banks
-              </div>
-            </div>
-            <Switch
-              bind:checked={draft.exportGuids}
-              label="Export GUIDs.txt"
-            />
-          </div>
-
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="font-medium text-zinc-200">Generate .bankbake Project File</div>
-              <div class="text-[11px] text-zinc-500">
-                Also save a <code class="text-zinc-400">&lt;BankName&gt;.bankbake</code> project archive with all audio assets when baking
-              </div>
-            </div>
-            <Switch
-              bind:checked={draft.exportProjectFile}
-              label="Generate .bankbake project file"
-            />
-          </div>
-
-          {#if showSuppressUpdateToggle}
-            <div class="flex items-center justify-between pt-2 border-t border-zinc-800/70">
-              <div>
-                <div class="font-medium text-zinc-200">Hide Update Notifications</div>
-                <div class="text-[11px] text-zinc-500">
-                  Turn off to re-enable new GitHub release update popups on startup
-                </div>
-              </div>
-              <Switch
-                bind:checked={draft.suppressUpdatePopup}
-                label="Hide update notifications"
-              />
-            </div>
-          {/if}
+          <Switch bind:checked={draft.exportGuids} label="Export GUIDs.txt" />
         </div>
-
-        <!-- Compiler Override / Debug Section (Shown in Debug Builds OR if Bundled FMOD is missing) -->
-        {#if showCompilerOverride}
-          <div class="space-y-3 pt-3 border-t border-amber-500/20">
-            <div class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-amber-400/90">
-              {#if isDebugBuild}
-                <Bug class="h-3.5 w-3.5" />
-                <span>Debug Build Options</span>
-              {:else}
-                <AlertTriangle class="h-3.5 w-3.5" />
-                <span>FMOD Studio Compiler Setup</span>
-              {/if}
+        <div class="setting-row">
+          <div>
+            <p>Save a project archive</p>
+            <p class="setting-help">Include audio and settings in a <code>.bankbake</code> file</p>
+          </div>
+          <Switch bind:checked={draft.exportProjectFile} label="Save a project archive" />
+        </div>
+        {#if showSuppressUpdateToggle}
+          <div class="setting-row">
+            <div>
+              <p>Hide update notifications</p>
+              <p class="setting-help">Turn off to show release updates on startup</p>
             </div>
-
-            <!-- Compiler Discovery Status Banner -->
-            <div
-              class="flex items-start gap-2.5 rounded-xl border p-2.5 {compilerInfo.available
-                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
-                : 'border-amber-500/30 bg-amber-500/10 text-amber-200'}"
-            >
-              {#if compilerInfo.available}
-                <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
-              {:else}
-                <AlertTriangle class="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
-              {/if}
-              <div class="min-w-0 flex-1 space-y-0.5">
-                <div class="font-medium">
-                  {compilerInfo.available
-                    ? `FMOD Compiler Available (${compilerInfo.source})`
-                    : "Bundled FMOD Compiler Not Found"}
-                </div>
-                <div class="text-[11px] opacity-85 break-all font-mono">
-                  {compilerInfo.path ?? compilerInfo.message}
-                </div>
-              </div>
-              <button
-                type="button"
-                onclick={() => onRecheckCompiler(draft.fmodCompilerPath)}
-                title="Re-verify FMOD compiler"
-                class="rounded-md p-1 hover:bg-white/10 transition-colors"
-              >
-                <RefreshCw class="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            <!-- FMOD Studio CLI Path Override -->
-            <div class="space-y-1.5">
-              <label for="fmod-path" class="block font-medium text-zinc-300">
-                FMOD Studio CLI Path (<code class="text-amber-300">fmodstudiocl.exe</code>)
-              </label>
-              <div class="flex gap-2">
-                <Input
-                  id="fmod-path"
-                  bind:value={draft.fmodCompilerPath}
-                  placeholder="Select fmodstudiocl.exe or leave blank for ./fmodstudio/fmodstudiocl.exe"
-                  class="h-8 text-xs font-mono"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  class="h-8 px-3 shrink-0"
-                  onclick={browseFmodCompiler}
-                >
-                  <FolderOpen class="h-3.5 w-3.5" />
-                  Browse
-                </Button>
-              </div>
-            </div>
-
-            <!-- Keep Temporary FMOD Project (Debug Build Only) -->
-            {#if isDebugBuild}
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="font-medium text-zinc-200">Keep Temporary FMOD Project</div>
-                  <div class="text-[11px] text-zinc-500">
-                    Retain generated <code class="text-zinc-400">.fspro</code> and <code class="text-zinc-400">bake.js</code> in temp directory for debugging
-                  </div>
-                </div>
-                <Switch
-                  bind:checked={draft.keepTempProject}
-                  label="Keep temporary FMOD project"
-                />
-              </div>
-            {/if}
+            <Switch bind:checked={draft.suppressUpdatePopup} label="Hide update notifications" />
           </div>
         {/if}
       </div>
+    </section>
 
-      <!-- Modal Footer -->
-      <div
-        class="flex items-center justify-end gap-2 border-t border-zinc-800 bg-zinc-950/50 px-5 py-3"
-      >
-        <Button type="button" variant="ghost" size="sm" onclick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          disabled={saving}
-          onclick={handleSave}
-        >
-          {saving ? "Saving..." : "Save Settings"}
-        </Button>
-      </div>
-    </div>
-  </div>
+    {#if showCompilerOverride}
+      <section class="space-y-3" aria-labelledby="settings-compiler">
+        <h3 id="settings-compiler" class="text-sm font-medium">FMOD compiler</h3>
+        <div class="flex items-center justify-between gap-3 rounded-md border bg-card p-3">
+          <div class="flex min-w-0 items-start gap-2">
+            {#if compilerInfo.available}
+              <CheckCircle2 class="mt-0.5 text-success" aria-hidden="true" />
+            {:else}
+              <AlertTriangle class="mt-0.5 text-primary" aria-hidden="true" />
+            {/if}
+            <div class="min-w-0 space-y-1">
+              <p class="text-sm">
+                {compilerInfo.available
+                  ? `Compiler available (${compilerInfo.source})`
+                  : "Compiler unavailable"}
+              </p>
+              <p class="break-all font-mono text-xs text-muted-foreground">{compilerInfo.path ?? compilerInfo.message}</p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onclick={() => onRecheckCompiler(draft.fmodCompilerPath)}
+            title="Recheck compiler"
+            aria-label="Recheck compiler"
+          >
+            <RefreshCw aria-hidden="true" />
+          </Button>
+        </div>
+        <div class="space-y-2">
+          <label for="fmod-path" class="field-label">FMOD Studio CLI path</label>
+          <div class="flex gap-2">
+            <Input
+              id="fmod-path"
+              bind:value={draft.fmodCompilerPath}
+              placeholder="Leave blank to auto-detect"
+              class="min-w-0 font-mono text-xs"
+            />
+            <Button type="button" variant="outline" onclick={browseFmodCompiler}>Browse</Button>
+          </div>
+        </div>
+        {#if isDebugBuild}
+          <div class="setting-row">
+            <div>
+              <p>Keep temporary project</p>
+              <p class="setting-help">Retain the generated <code>.fspro</code> and <code>bake.js</code> for debugging</p>
+            </div>
+            <Switch bind:checked={draft.keepTempProject} label="Keep temporary project" />
+          </div>
+        {/if}
+      </section>
+    {/if}
+
+    {#snippet actions()}
+      <Button type="button" variant="ghost" onclick={onClose}>Cancel</Button>
+      <Button type="button" disabled={saving} onclick={handleSave}>
+        {saving ? "Saving…" : "Save settings"}
+      </Button>
+    {/snippet}
+  </Dialog>
 {/if}
+
+<style>
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 56px;
+    padding-block: 8px;
+  }
+
+  .setting-help {
+    margin-top: 4px;
+    font-size: 12px;
+    color: hsl(var(--muted-foreground));
+  }
+</style>

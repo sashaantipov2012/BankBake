@@ -1,54 +1,99 @@
+/* Design pass informed by Unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 240 10% 4.5%;
-    --foreground: 240 5% 96%;
-    --card: 240 9% 7.5%;
-    --card-foreground: 240 5% 96%;
-    --popover: 240 10% 6%;
-    --popover-foreground: 240 5% 96%;
-    --primary: 38 92% 50%;
-    --primary-foreground: 24 10% 6%;
-    --secondary: 240 6% 12%;
-    --secondary-foreground: 240 5% 92%;
-    --muted: 240 6% 12%;
-    --muted-foreground: 240 5% 60%;
-    --accent: 38 92% 50%;
-    --accent-foreground: 24 10% 6%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 6% 15%;
-    --input: 240 6% 15%;
-    --ring: 38 92% 50%;
-    --radius: 0.625rem;
+    color-scheme: dark;
+    --background: 36 4% 9%;
+    --foreground: 40 14% 92%;
+    --card: 36 5% 12%;
+    --card-foreground: var(--foreground);
+    --popover: 36 5% 14%;
+    --popover-foreground: var(--foreground);
+    --primary: 35 71% 66%;
+    --primary-foreground: 35 21% 10%;
+    --secondary: 36 6% 17%;
+    --secondary-foreground: 36 9% 77%;
+    --muted: var(--secondary);
+    --muted-foreground: 35 7% 61%;
+    --accent: var(--primary);
+    --accent-foreground: var(--primary-foreground);
+    --destructive: 7 61% 71%;
+    --destructive-foreground: var(--background);
+    --success: 151 30% 64%;
+    --border: 35 5% 23%;
+    --input: var(--border);
+    --ring: var(--primary);
+    --radius: 0.75rem;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    @apply bg-background text-foreground antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+
+  code,
+  pre {
+    font-family: var(--mono);
+  }
+
+  :where(button, input, a):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    color: hsl(var(--primary-foreground));
+    background: hsl(var(--primary));
   }
 }
 
-/* Custom subtle dark scrollbar */
-::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+.lucide {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke-width: 1.5;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(245, 158, 11, 0.45);
+
+@layer components {
+  .field-label {
+    @apply block text-xs font-medium text-secondary-foreground;
+  }
+
+  .log-output {
+    @apply max-h-48 overflow-auto rounded-md border bg-background p-3 font-mono text-xs text-secondary-foreground;
+  }
+
+  .dialog-panel {
+    @apply fixed inset-0 m-auto min-h-0 overflow-hidden rounded-xl border bg-popover text-foreground;
+    width: min(520px, calc(100% - 32px));
+    max-height: calc(100% - 32px);
+  }
+
+  .dialog-panel[open] {
+    @apply flex flex-col;
+  }
+
+  .dialog-panel::backdrop {
+    background: rgb(0 0 0 / 65%);
+  }
+
+  .dialog-header {
+    @apply flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3;
+  }
+
+  .dialog-body {
+    @apply min-h-0 space-y-4 overflow-y-auto p-5 text-sm;
+  }
+
+  .dialog-footer {
+    @apply flex shrink-0 items-center justify-end gap-2 border-t px-5 py-3;
+  }
 }

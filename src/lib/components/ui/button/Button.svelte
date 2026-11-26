@@ -18,28 +18,28 @@
 
   const variants: Record<NonNullable<Props["variant"]>, string> = {
     default:
-      "bg-amber-500 text-zinc-950 font-semibold hover:bg-amber-400 active:bg-amber-500 shadow-sm shadow-amber-500/10",
+      "bg-foreground text-background hover:bg-foreground/90",
     secondary:
-      "bg-zinc-800/90 text-zinc-100 hover:bg-zinc-700/80 border border-zinc-700/60",
+      "border bg-secondary text-foreground hover:bg-secondary/70",
     outline:
-      "border border-zinc-800 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800/80 hover:text-zinc-100 hover:border-zinc-700",
+      "border bg-background text-secondary-foreground hover:bg-secondary hover:text-foreground",
     ghost:
-      "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60",
+      "text-secondary-foreground hover:bg-secondary hover:text-foreground",
     destructive:
-      "bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 hover:text-red-300",
+      "border text-destructive hover:bg-secondary",
   };
 
   const sizes: Record<NonNullable<Props["size"]>, string> = {
-    default: "h-9 px-4 py-2 text-sm rounded-lg",
-    sm: "h-7 px-2.5 text-xs rounded-md",
-    lg: "h-11 px-6 text-sm rounded-xl",
-    icon: "h-8 w-8 rounded-lg flex items-center justify-center p-0",
+    default: "h-9 px-3 text-sm rounded-sm",
+    sm: "h-8 px-3 text-xs rounded-sm",
+    lg: "h-10 px-5 text-sm rounded-sm",
+    icon: "h-8 w-8 rounded-sm p-0",
   };
 </script>
 
 <button
   class={cn(
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 disabled:pointer-events-none disabled:opacity-45 select-none",
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors duration-150 motion-reduce:transition-none disabled:pointer-events-none disabled:opacity-50 select-none",
     variants[variant],
     sizes[size],
     className

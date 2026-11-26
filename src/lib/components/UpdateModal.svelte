@@ -1,9 +1,10 @@
 <script lang="ts">
   import { openUrl } from "@tauri-apps/plugin-opener";
   import type { GithubReleaseInfo } from "$lib/types";
+  import Dialog from "$lib/components/ui/dialog/Dialog.svelte";
   import Button from "$lib/components/ui/button/Button.svelte";
   import Switch from "$lib/components/ui/switch/Switch.svelte";
-  import { ArrowUpCircle, ExternalLink, X } from "lucide-svelte";
+  import { ExternalLink } from "lucide-svelte";
 
   interface Props {
     openModal: boolean;
@@ -36,126 +37,55 @@
 </script>
 
 {#if openModal && release}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="update-title"
-  >
-    <div
-      class="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl overflow-hidden"
-    >
-      <!-- Header -->
-      <div
-        class="flex items-center justify-between border-b border-zinc-800 px-5 py-3.5"
-      >
-        <div class="flex items-center gap-2">
-          <ArrowUpCircle class="h-4 w-4 text-amber-400" />
-          <h2 id="update-title" class="text-sm font-semibold text-zinc-100">
-            New Update Available
-          </h2>
-        </div>
-        <button
-          type="button"
-          onclick={() => onDismiss(neverShowAgain)}
-          class="rounded-lg p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
-        >
-          <X class="h-4 w-4" />
-        </button>
+  <Dialog title="BankBake update available" onClose={() => onDismiss(neverShowAgain)}>
+    <dl class="grid grid-cols-2 divide-x rounded-md border bg-card">
+      <div class="space-y-1 p-3">
+        <dt class="text-xs text-muted-foreground">Installed</dt>
+        <dd class="font-mono text-sm">v{currentVersion}</dd>
       </div>
-
-      <!-- Body -->
-      <div class="space-y-3.5 p-5 text-xs">
-        <p class="text-zinc-300 leading-relaxed">
-          A newer version of <strong class="text-zinc-100">BankBake</strong> is available on GitHub Releases.
-        </p>
-
-        <div
-          class="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-950/70 px-3.5 py-2.5 font-mono"
-        >
-          <div class="text-zinc-400">
-            Current: <span class="text-zinc-200">v{currentVersion}</span>
-          </div>
-          <div class="text-amber-400 font-semibold">
-            Latest: v{release.version}
-          </div>
-        </div>
-
-        {#if release.missedReleases && release.missedReleases.some((r) => r.body && r.body.trim() !== "")}
-          <div class="space-y-1">
-            <div class="flex items-center justify-between text-[11px] font-medium text-zinc-400">
-              <span>Release Notes</span>
-              {#if release.missedReleases.length > 1}
-                <span class="text-[10px] font-mono text-amber-400/90">
-                  {release.missedReleases.length} newer releases
-                </span>
-              {/if}
-            </div>
-            <div
-              class="max-h-48 overflow-y-auto rounded-lg border border-zinc-800/80 bg-zinc-950/50 p-2.5 text-[11px] text-zinc-300 space-y-3"
-            >
-              {#each release.missedReleases as item (item.tagName)}
-                {#if item.body && item.body.trim() !== ""}
-                  <div class="space-y-1 not-first:pt-2.5 not-first:border-t not-first:border-zinc-800/80">
-                    <div class="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-amber-400">
-                      <span>v{item.version}</span>
-                      {#if item.name && item.name !== item.tagName && item.name !== `v${item.version}`}
-                        <span class="text-zinc-500 font-sans font-normal">• {item.name}</span>
-                      {/if}
-                    </div>
-                    <div class="whitespace-pre-wrap text-zinc-300 leading-relaxed">{item.body.trim()}</div>
-                  </div>
-                {/if}
-              {/each}
-            </div>
-          </div>
-        {:else if release.body && release.body.trim() !== ""}
-          <div class="space-y-1">
-            <div class="text-[11px] font-medium text-zinc-400">Release Notes</div>
-            <div
-              class="max-h-32 overflow-y-auto rounded-lg border border-zinc-800/80 bg-zinc-950/50 p-2.5 text-[11px] text-zinc-300 whitespace-pre-wrap"
-            >
-              {release.body.trim()}
-            </div>
-          </div>
-        {/if}
-
-        <!-- Optional "Never show again" toggle -->
-        <div
-          class="flex items-center justify-between pt-2 border-t border-zinc-800/80"
-        >
-          <span class="text-zinc-400 select-none">
-            Don't show update notifications again
-          </span>
-          <Switch
-            bind:checked={neverShowAgain}
-            label="Never show update popup again"
-          />
-        </div>
+      <div class="space-y-1 p-3">
+        <dt class="text-xs text-muted-foreground">Latest</dt>
+        <dd class="font-mono text-sm text-primary">v{release.version}</dd>
       </div>
+    </dl>
 
-      <!-- Footer -->
-      <div
-        class="flex items-center justify-end gap-2 border-t border-zinc-800 bg-zinc-950/50 px-5 py-3"
-      >
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onclick={() => onDismiss(neverShowAgain)}
-        >
-          Skip
-        </Button>
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          onclick={handleOpenReleases}
-        >
-          <ExternalLink class="h-3.5 w-3.5" />
-          Open GitHub Releases
-        </Button>
-      </div>
+    {#if release.missedReleases && release.missedReleases.some((item) => item.body?.trim())}
+      <section class="space-y-2" aria-labelledby="release-notes">
+        <h3 id="release-notes" class="field-label">Release notes</h3>
+        <div class="max-h-48 divide-y overflow-y-auto rounded-md border bg-card px-3">
+          {#each release.missedReleases as item (item.tagName)}
+            {#if item.body?.trim()}
+              <div class="space-y-1 py-3">
+                <h4 class="text-sm font-medium">
+                  <span class="font-mono">v{item.version}</span>
+                  {#if item.name && item.name !== item.tagName && item.name !== `v${item.version}`}
+                    <span class="text-secondary-foreground">· {item.name}</span>
+                  {/if}
+                </h4>
+                <p class="whitespace-pre-wrap break-words text-sm text-secondary-foreground">{item.body.trim()}</p>
+              </div>
+            {/if}
+          {/each}
+        </div>
+      </section>
+    {:else if release.body?.trim()}
+      <section class="space-y-2" aria-labelledby="release-notes">
+        <h3 id="release-notes" class="field-label">Release notes</h3>
+        <p class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-card p-3 text-sm text-secondary-foreground">{release.body.trim()}</p>
+      </section>
+    {/if}
+
+    <div class="flex items-center justify-between gap-3">
+      <span class="text-sm text-secondary-foreground">Hide update notifications</span>
+      <Switch bind:checked={neverShowAgain} label="Hide update notifications" />
     </div>
-  </div>
+
+    {#snippet actions()}
+      <Button type="button" variant="ghost" onclick={() => onDismiss(neverShowAgain)}>Skip</Button>
+      <Button type="button" onclick={handleOpenReleases}>
+        Open GitHub releases
+        <ExternalLink aria-hidden="true" />
+      </Button>
+    {/snippet}
+  </Dialog>
 {/if}
