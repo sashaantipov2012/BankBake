@@ -77,12 +77,6 @@
       const selected = await open({
         multiple: false,
         directory: false,
-        filters: [
-          {
-            name: "FMOD Studio CLI",
-            extensions: ["exe"],
-          },
-        ],
       });
       if (selected && typeof selected === "string") {
         draft.fmodCompilerPath = selected;
@@ -236,7 +230,7 @@
                 <div class="font-medium">
                   {compilerInfo.available
                     ? `FMOD Compiler Available (${compilerInfo.source})`
-                    : "Bundled FMOD Compiler Not Found"}
+                    : "FMOD Compiler Not Found"}
                 </div>
                 <div class="text-[11px] opacity-85 break-all font-mono">
                   {compilerInfo.path ?? compilerInfo.message}
@@ -255,13 +249,13 @@
             <!-- FMOD Studio CLI Path Override -->
             <div class="space-y-1.5">
               <label for="fmod-path" class="block font-medium text-zinc-300">
-                FMOD Studio CLI Path (<code class="text-amber-300">fmodstudiocl.exe</code>)
+                FMOD Studio CLI Path
               </label>
               <div class="flex gap-2">
                 <Input
                   id="fmod-path"
                   bind:value={draft.fmodCompilerPath}
-                  placeholder="Select fmodstudiocl.exe or leave blank for ./fmodstudio/fmodstudiocl.exe"
+                  placeholder="Leave blank to auto-detect"
                   class="h-8 text-xs font-mono"
                 />
                 <Button

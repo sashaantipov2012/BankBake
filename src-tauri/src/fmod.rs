@@ -75,7 +75,7 @@ pub struct CompilerInfo {
     pub available: bool,
     pub bundled_available: bool,
     pub path: Option<String>,
-    pub source: String, // "configured", "bundled", "system", "not_found"
+    pub source: String, // "configured", "bundled", "system", "wine", "not_found"
     pub version: Option<String>,
     pub message: String,
 }
@@ -238,8 +238,8 @@ pub fn sanitize_bank_name(name: &str) -> Result<String, String> {
     Ok(trimmed.to_string())
 }
 
-/// Check if the bundled `fmodstudio/fmodstudiocl.exe` exists relative to the app or workspace
-pub fn find_bundled_compiler() -> Option<PathBuf> {
+/// Find the bundled Windows CLI relative to the app or workspace.
+fn find_bundled_windows_cli() -> Option<PathBuf> {
     let mut candidate_roots: Vec<PathBuf> = Vec::new();
     if let Ok(cwd) = std::env::current_dir() {
         candidate_roots.push(cwd.join("fmodstudio"));
@@ -278,7 +278,15 @@ pub fn find_bundled_compiler() -> Option<PathBuf> {
     None
 }
 
-/// Discover FMOD Studio CLI executable (`fmodstudiocl.exe` or `fmodstudio.exe`)
+/// Find the bundled compiler that takes precedence over custom paths in release builds.
+pub fn find_bundled_compiler() -> Option<PathBuf> {
+    #[cfg(not(target_os = "linux"))]
+    return find_bundled_windows_cli();
+    #[cfg(target_os = "linux")]
+    return None;
+}
+
+#[cfg(not(target_os = "linux"))]
 pub fn discover_compiler(custom_path: Option<&str>) -> CompilerInfo {
     let bundled_exe = find_bundled_compiler();
     let bundled_available = bundled_exe.is_some();
@@ -374,6 +382,126 @@ pub fn discover_compiler(custom_path: Option<&str>) -> CompilerInfo {
         version: None,
         message: "FMOD Studio CLI (fmodstudiocl.exe) not found. Configure path in Settings.".to_string(),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn linux_executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
+    path.metadata()
+        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+}
+
+#[cfg(target_os = "linux")]
+fn executable_on_path(name: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|dir| dir.join(name))
+        .find(|candidate| linux_executable(candidate))
+}
+
+#[cfg(target_os = "linux")]
+fn is_windows_executable(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
+}
+
+#[cfg(target_os = "linux")]
+pub fn discover_compiler(custom_path: Option<&str>) -> CompilerInfo {
+    let wine_available = cfg!(target_arch = "x86_64")
+        && executable_on_path("wine").is_some()
+        && executable_on_path("winepath").is_some();
+
+    let configured = custom_path
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .and_then(|path| {
+            let path = std::path::absolute(path).ok()?;
+            let candidates = if path.is_dir() {
+                vec![path.join("fmodstudiocl"), path.join("fmodstudiocl.exe")]
+            } else {
+                vec![path]
+            };
+            candidates.into_iter().find(|path| {
+                if is_windows_executable(path) {
+                    wine_available && path.is_file()
+                } else {
+                    linux_executable(path)
+                }
+            })
+        });
+
+    let compiler = configured
+        .map(|path| {
+            let source = if is_windows_executable(&path) {
+                "wine"
+            } else {
+                "configured"
+            };
+            (path, source, None)
+        })
+        .or_else(|| {
+            executable_on_path("fmodstudiocl")
+                .or_else(|| {
+                    let path = PathBuf::from("/opt/fmodstudio/fmodstudiocl");
+                    linux_executable(&path).then_some(path)
+                })
+                .map(|path| (path, "system", None))
+        })
+        .or_else(|| {
+            if wine_available {
+                find_bundled_windows_cli().map(|path| (path, "wine", Some("FMOD Studio 2.02.35")))
+            } else {
+                None
+            }
+        });
+
+    if let Some((path, source, version)) = compiler {
+        return CompilerInfo {
+            available: true,
+            bundled_available: false,
+            path: Some(path.to_string_lossy().into_owned()),
+            source: source.to_string(),
+            version: version.map(str::to_string),
+            message: format!("FMOD Studio CLI found at {}", path.display()),
+        };
+    }
+
+    let mut message = "FMOD Studio CLI (fmodstudiocl) not found. Install FMOD Studio or set the CLI path in Settings.".to_string();
+    if cfg!(target_arch = "x86_64") {
+        message.push_str(" Install Wine to use the bundled Windows CLI.");
+    }
+    CompilerInfo {
+        available: false,
+        bundled_available: false,
+        path: None,
+        source: "not_found".to_string(),
+        version: None,
+        message,
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn wine_workspace_path(path: &Path) -> Result<String, String> {
+    let output = Command::new("winepath")
+        .args(["-w", "--"])
+        .arg(path)
+        .output()
+        .map_err(|e| format!("Failed to run winepath: {}", e))?;
+    if !output.status.success() {
+        return Err(format!(
+            "winepath could not map {}: {}",
+            path.display(),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let mapped = String::from_utf8_lossy(&output.stdout);
+    let mapped = mapped.trim_end_matches(['\r', '\n']);
+    if mapped.is_empty() {
+        return Err(format!("winepath returned no path for {}", path.display()));
+    }
+    // Keep Wine's drive mapping and use forward slashes for FMOD's Qt file APIs.
+    Ok(mapped.replace('\\', "/"))
 }
 
 /// Fast WAV/OGG header duration probing fallback so backend can also report duration if available
@@ -1182,15 +1310,13 @@ pub fn execute_bake_bank(request: &BakeBankRequest, config: &AppConfig) -> Resul
         }
     }
 
-    // Discover compiler (custom path override is used in debug builds or when bundled compiler is missing)
+    // Use the requested compiler path, falling back to the saved settings and automatic discovery.
     let compiler_override = request
         .fmod_compiler_path
         .as_deref()
         .or(config.fmod_compiler_path.as_deref());
     let compiler_info = discover_compiler(compiler_override);
-    let compiler_exe = compiler_info
-        .path
-        .ok_or_else(|| "FMOD Studio CLI compiler (fmodstudiocl.exe) could not be found.".to_string())?;
+    let compiler_exe = compiler_info.path.ok_or(compiler_info.message)?;
 
     // Determine output directory
     let out_dir_str = request
@@ -1245,6 +1371,21 @@ pub fn execute_bake_bank(request: &BakeBankRequest, config: &AppConfig) -> Resul
     let export_project = request.export_project_file.unwrap_or(config.export_project_file);
     let keep_temp = cfg!(debug_assertions) && config.keep_temp_project;
 
+    #[cfg(target_os = "linux")]
+    let wine_workspace = if compiler_info.source == "wine" {
+        match wine_workspace_path(&temp_workspace) {
+            Ok(path) => Some(path),
+            Err(error) => {
+                if !keep_temp {
+                    let _ = fs::remove_dir_all(&temp_workspace);
+                }
+                return Err(error);
+            }
+        }
+    } else {
+        None
+    };
+
     // Stage audio files into a clean folder with safe ASCII filenames (`audio_0.ogg`, etc.)
     // so that special characters, spaces, apostrophes, Unicode, or duplicate filenames
     // in the user's original paths never trip up FMOD Studio's JS engine or asset importer.
@@ -1269,6 +1410,10 @@ pub fn execute_bake_bank(request: &BakeBankRequest, config: &AppConfig) -> Resul
             )
         })?;
         ev.file_path = dst_path.to_string_lossy().to_string();
+        #[cfg(target_os = "linux")]
+        if let Some(workspace) = &wine_workspace {
+            ev.file_path = format!("{workspace}/StagedAudio/{safe_filename}");
+        }
     }
 
     let js_code = generate_fmod_bake_script(&bank_name, &master_bank_name, &staged_events, export_guids);
@@ -1276,17 +1421,44 @@ pub fn execute_bake_bank(request: &BakeBankRequest, config: &AppConfig) -> Resul
     fs::write(&script_path, &js_code)
         .map_err(|e| format!("Failed to write bake.js script: {}", e))?;
 
-    // Execute fmodstudiocl.exe
-    let output = Command::new(&compiler_exe)
-        .arg("-script")
-        .arg(&script_path)
-        .arg(&fspro_path)
+    let mut command = Command::new(&compiler_exe);
+    command.arg("-script").arg(&script_path).arg(&fspro_path);
+    #[cfg(not(target_os = "linux"))]
+    command
         .env("LOCALAPPDATA", &local_appdata)
         .env("APPDATA", &roaming_appdata)
         .env("TEMP", &temp_env_dir)
-        .env("TMP", &temp_env_dir)
-        .output()
-        .map_err(|e| format!("Failed to execute FMOD compiler ({}): {}", compiler_exe, e))?;
+        .env("TMP", &temp_env_dir);
+    #[cfg(target_os = "linux")]
+    if let Some(workspace) = &wine_workspace {
+        let fspro_filename = fspro_path.file_name().expect("FMOD project filename");
+        command = Command::new("wine");
+        command
+            .arg(&compiler_exe)
+            .arg("-script")
+            .arg(format!("{workspace}/Project/bake.js"))
+            .arg(format!("{workspace}/Project/{}", fspro_filename.to_string_lossy()))
+            .env("LOCALAPPDATA", format!("{workspace}/LocalAppData"))
+            .env("APPDATA", format!("{workspace}/AppData"))
+            .env("TEMP", format!("{workspace}/Temp"))
+            .env("TMP", format!("{workspace}/Temp"));
+    } else {
+        command
+            .env("XDG_CONFIG_HOME", &roaming_appdata)
+            .env("TMPDIR", &temp_env_dir);
+    }
+
+    let output = match command.output() {
+        Ok(output) => output,
+        Err(error) => {
+            if !keep_temp {
+                let _ = fs::remove_dir_all(&temp_workspace);
+            }
+            return Err(format!(
+                "Failed to execute FMOD compiler ({compiler_exe}): {error}"
+            ));
+        }
+    };
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -1859,10 +2031,32 @@ pub fn load_bankbake_project(project_path: &Path) -> Result<LoadedProjectData, S
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "linux")]
     #[test]
-    fn test_discover_bundled_fmod_and_bake_bank() {
+    fn linux_discovers_extensionless_compiler_in_configured_directory() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!("bankbake_compiler_{}", Uuid::new_v4()));
+        fs::create_dir(&dir).unwrap();
+        let cli = dir.join("fmodstudiocl");
+        fs::write(&cli, "#!/bin/sh\nexit 0\n").unwrap();
+        fs::set_permissions(&cli, fs::Permissions::from_mode(0o644)).unwrap();
+        let before = discover_compiler(dir.to_str());
+        fs::set_permissions(&cli, fs::Permissions::from_mode(0o755)).unwrap();
+        let after = discover_compiler(dir.to_str());
+        fs::remove_dir_all(&dir).unwrap();
+
+        assert_ne!(before.path.as_deref(), cli.to_str());
+        assert!(after.available);
+        assert_eq!(after.source, "configured");
+        assert_eq!(after.path.as_deref(), cli.to_str());
+    }
+
+    #[test]
+    #[cfg_attr(target_os = "linux", ignore = "requires FMOD Studio or Wine on Linux")]
+    fn test_discover_compiler_and_bake_bank() {
         let info = discover_compiler(None);
-        assert!(info.available, "Expected bundled FMOD Studio CLI to be discovered: {:?}", info);
+        assert!(info.available, "{}", info.message);
 
         let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -1875,8 +2069,7 @@ mod tests {
         assert_eq!(inspected.suggested_event_name, "ui_cancel");
         assert!(inspected.duration_seconds.unwrap_or(0.0) > 0.5);
 
-        let out_dir = std::env::temp_dir().join("bankbake_test_out_1");
-        let _ = fs::remove_dir_all(&out_dir);
+        let out_dir = std::env::temp_dir().join(format!("bankbake_test_{}", Uuid::new_v4()));
 
         let req = BakeBankRequest {
             bank_name: "RustTestBank".to_string(),
@@ -1945,8 +2138,7 @@ mod tests {
 
         // Verify a second bake produces a distinct Master.bank / Master.strings.bank GUID
         // so multiple mods can load their Master.bank and Master.strings.bank concurrently.
-        let out_dir_2 = std::env::temp_dir().join("bankbake_test_out_2");
-        let _ = fs::remove_dir_all(&out_dir_2);
+        let out_dir_2 = out_dir.join("second_bake");
         let mut req2 = req.clone();
         req2.bank_name = "SecondModBank".to_string();
         req2.master_bank_name = Some("CustomMaster".to_string());
@@ -1972,6 +2164,5 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(&out_dir);
-        let _ = fs::remove_dir_all(&out_dir_2);
     }
 }

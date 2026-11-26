@@ -1,33 +1,40 @@
 import fs from "fs";
 import path from "path";
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 
 const rootDir = process.cwd();
+const isWindows = process.platform === "win32";
+const isLinux = process.platform === "linux";
+if (!isWindows && !isLinux) {
+  console.error("Portable packaging is supported on Windows and Linux.");
+  process.exit(1);
+}
+
 const pkgJson = JSON.parse(
   fs.readFileSync(path.join(rootDir, "package.json"), "utf8")
 );
 const version = pkgJson.version || "1.0.0";
-const releaseOutDir = path.join(rootDir, "release", `BankBake-v${version}`);
-const zipOutPath = path.join(
-  rootDir,
-  "release",
-  `BankBake-Portable-v${version}-win-x64.zip`
-);
+const releaseDir = path.join(rootDir, "release");
+const linuxArchiveName = `BankBake-Portable-v${version}-linux-${process.arch}`;
+const releaseOutDir = path.join(releaseDir, isWindows ? `BankBake-v${version}` : linuxArchiveName);
+const archivePath = isWindows
+  ? path.join(releaseDir, `BankBake-Portable-v${version}-win-x64.zip`)
+  : path.join(releaseDir, `${linuxArchiveName}.tar.gz`);
 
 console.log(`=== Building BankBake v${version} Portable Release ===`);
 execSync("pnpm tauri build --no-bundle", { stdio: "inherit" });
 
-// Locate built bankbake.exe
+const executable = isWindows ? "bankbake.exe" : "bankbake";
 const candidateExes = [
-  path.join(rootDir, "src-tauri", "target", "release", "bankbake.exe"),
   process.env.CARGO_TARGET_DIR
-    ? path.join(process.env.CARGO_TARGET_DIR, "release", "bankbake.exe")
+    ? path.resolve(rootDir, "src-tauri", process.env.CARGO_TARGET_DIR, "release", executable)
     : "",
+  path.join(rootDir, "src-tauri", "target", "release", executable),
 ].filter(Boolean);
 
 const builtExe = candidateExes.find((p) => fs.existsSync(p));
 if (!builtExe) {
-  console.error("Could not find compiled bankbake.exe in target/release.");
+  console.error(`Could not find compiled ${executable} in target/release.`);
   process.exit(1);
 }
 
@@ -37,12 +44,11 @@ console.log(`Found compiled executable: ${builtExe}`);
 fs.rmSync(releaseOutDir, { recursive: true, force: true });
 fs.mkdirSync(releaseOutDir, { recursive: true });
 
-// 1. Copy BankBake.exe
-fs.copyFileSync(builtExe, path.join(releaseOutDir, "BankBake.exe"));
+fs.copyFileSync(builtExe, path.join(releaseOutDir, isWindows ? "BankBake.exe" : executable));
 
 // 2. Copy stripped fmodstudio/ folder
 const fmodSrc = path.join(rootDir, "fmodstudio");
-if (fs.existsSync(fmodSrc)) {
+if ((isWindows || process.arch === "x64") && fs.existsSync(fmodSrc)) {
   console.log("Copying bundled fmodstudio/ runtime...");
   fs.cpSync(fmodSrc, path.join(releaseOutDir, "fmodstudio"), { recursive: true });
 }
@@ -55,15 +61,18 @@ if (fs.existsSync(samplesSrc)) {
 }
 
 // 4. Create zip archive on Windows using PowerShell Compress-Archive
-if (process.platform === "win32") {
-  console.log(`Creating portable zip archive: ${zipOutPath}`);
-  fs.rmSync(zipOutPath, { force: true });
+if (isWindows) {
+  fs.rmSync(archivePath, { force: true });
   execSync(
-    `powershell -NoProfile -Command "Compress-Archive -Path '${releaseOutDir}\\*' -DestinationPath '${zipOutPath}' -Force"`,
+    `powershell -NoProfile -Command "Compress-Archive -Path '${releaseOutDir}\\*' -DestinationPath '${archivePath}' -Force"`,
     { stdio: "inherit" }
   );
+} else {
+  execFileSync("tar", ["-czf", archivePath, "-C", releaseDir, linuxArchiveName], {
+    stdio: "inherit",
+  });
 }
 
 console.log("\n=== Portable Build Complete! ===");
 console.log(`Portable folder: ${releaseOutDir}`);
-console.log(`Portable zip:    ${zipOutPath}`);
+console.log(`Portable archive: ${archivePath}`);
